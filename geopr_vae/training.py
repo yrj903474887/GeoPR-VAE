@@ -1,4 +1,4 @@
-"""Train-only nuisance learning from frozen M40 pseudo-null/intervention math."""
+"""Training-only nuisance learning from paired pseudo-null and enrichment fields."""
 import time
 import numpy as np
 import torch
@@ -38,7 +38,7 @@ def train_residual_head(train_x,train_c,train_xy,train_reference,seed,config=Non
         case=int(order.pop());optimizer.zero_grad(set_to_none=True)
         n0=model.nuisance_from_features(t0[case]);n1=model.nuisance_from_features(t1[case])
         terms=nuisance_loss(n0,n1,t0[case,...,:12],td[case],cfg);loss=terms['total_loss']
-        if not isinstance(loss,torch.Tensor) or not torch.isfinite(loss):raise FloatingPointError('Invalid/nonfinite M41 objective')
+        if not isinstance(loss,torch.Tensor) or not torch.isfinite(loss):raise FloatingPointError('Invalid/nonfinite recovery objective')
         loss.backward();gradient=torch.nn.utils.clip_grad_norm_(model.parameters(),cfg['gradient_clip'],error_if_nonfinite=True);optimizer.step()
         history.append(dict(epoch=epoch,bank_index=case,gradient_norm=float(gradient),**{k:float(v.detach()) for k,v in terms.items()}))
     metadata.update(seed=seed,epochs=epochs,preparation_seconds=prep_seconds,fit_seconds=time.perf_counter()-fit_start,

@@ -1,15 +1,13 @@
-"""M41 Gaussian scorer, adapted from frozen read-only M36 pure mathematics.
+"""Calibrated Gaussian spatial anomaly scoring.
 
 Independent calibration halves; only threshold-half rows form the calibration
-smoothing graph. Supported bandwidths are0/3000/6000/10000metres, including self
-and truncated at3h. Native normalizations are raw/cal_mad/negative_half.
+smoothing graph. Supported bandwidths are 0/3000/6000/10000 metres, including self
+and truncated at 3h. Native normalizations are raw/cal_mad/negative_half.
 Power correction is disabled and the full calibration-pool mode is rejected.
-Field-MAD preprocessing, when requested by the M41 driver, must be applied
+Field-MAD preprocessing, when requested by the caller, must be applied
 separately to each query field and to the two calibration halves before using
 norm='cal_mad'. This adaptive preprocessing is explicitly transductive.
 
-All numeric operations after validation reproduce M36 threshold-pool/no-power
-calculations. No old source, guard or module constants are modified.
 """
 from __future__ import annotations
 
@@ -43,13 +41,13 @@ def score_fields(residual, cal_residual, val_xy, cal_xy, cal_ids, norm, radius_m
     if not np.isfinite(vx).all() or not np.isfinite(cx).all():
         raise ValueError("all coordinates must be finite projected metres")
     if norm not in NORMALIZATIONS or float(radius_m) not in RADII_M:
-        raise ValueError("norm and radius_m must belong to the M41 native3x4 grid")
+        raise ValueError("norm and radius_m must belong to the supported normalization/bandwidth grid")
     if pool != "threshold":
-        raise ValueError("M41 requires independent threshold calibration pool")
+        raise ValueError("An independent threshold calibration pool is required")
     if not isinstance(power_correction, (bool, np.bool_)):
         raise ValueError("power_correction must be boolean")
     if power_correction:
-        raise ValueError("M41 Gaussian scoring keeps power_correction=False")
+        raise ValueError("Gaussian scoring requires power_correction=False")
     fit_idx, original_threshold_idx = split_calibration(ids)
     if pool == "threshold":
         cal_pool_indices = original_threshold_idx.copy()
@@ -81,7 +79,7 @@ def score_fields(residual, cal_residual, val_xy, cal_xy, cal_ids, norm, radius_m
         cal_values = cal_values / cal_factor[None, :]
     wq, wc = gaussian_weights(vx, radius_m), gaussian_weights(calibration_xy, radius_m)
     query_power, cal_power = np.sum(wq * wq, axis=1), np.sum(wc * wc, axis=1)
-    # Compute row means before dividing, so full+False exactly reproduces M35.
+    # Compute row means before dividing.
     signed_query = np.matmul(wq, values)
     signed_cal = np.matmul(wc, cal_values)
     if power_correction:
@@ -125,7 +123,7 @@ def score_fields(residual, cal_residual, val_xy, cal_xy, cal_ids, norm, radius_m
                 "query_cases_separate": True, "transductive": norm.startswith("negative_") or float(radius_m) > 0,
                 "no_conformal_guarantee": True,
                 "limitations": [
-                    "M41 does not apply row-power correction; smoothing changes marginal variance according to neighborhood geometry.",
+                    "The scorer does not apply row-power correction; smoothing changes marginal variance according to neighborhood geometry.",
                     "Spatially correlated noise instead has row variance w^T K w; correcting sum(w^2) need not calibrate it.",
                     "Row-stochastic Gaussian means preserve constant fields; fitted-center errors and shared noise can persist.",
                     "Field normalization and smoothing remain transductive and induce dependence; no conformal guarantee is claimed.",

@@ -27,12 +27,13 @@ def _indices(indices, n, name):
 
 
 def fit(data, method="GeoPR-VAE", train=None, calibration=None, seed=20260929,
-        teacher_epochs=600, head_epochs=300, head_config=None):
-    """Fit only explicit training rows. Default split is regional deployment."""
+        teacher_epochs=600, head_epochs=300, head_config=None, head_seed=None):
+    """Fit explicit training rows; head_seed defaults to the reference seed."""
     if method not in CONFIGS:
         raise ValueError(f"method must be one of {tuple(CONFIGS)}")
     if teacher_epochs < 1 or head_epochs < 1:
         raise ValueError("Epoch counts must be positive")
+    recovery_seed=int(seed if head_seed is None else head_seed)
     d = validate_data(data)
     if train is None and calibration is None:
         train, calibration = regional_split(d["ids"], d["xy"])
@@ -71,18 +72,20 @@ def fit(data, method="GeoPR-VAE", train=None, calibration=None, seed=20260929,
     cal_carrier = residual[ic].copy()
     if method == "GeoPR-VAE":
         head, head_history = train_residual_head(a["r"][it], a["F"][it], a["xy"][it],
-                                                pred["reference"][it], int(seed), head_config, head_epochs)
+                                                pred["reference"][it], recovery_seed, head_config, head_epochs)
         # Recovery neighborhoods must not connect scale-fit and threshold pools.
         for indices in scoring.split_calibration(a["ids"][ic]):
             cal_carrier[indices] = head.predict(residual[ic][indices], a["F"][ic][indices],
                                                 a["xy"][ic][indices])["correction"]
     bundle = dict(format="GeoPR-VAE-portable-v1", method=method, seed=int(seed),
+                  head_seed=recovery_seed if head is not None else None,
                   reference=model.state(), head=None if head is None else head.state(),
                   preprocessing=state, calibration=dict(carrier=cal_carrier.tolist(),
                   xy=a["xy"][ic].tolist(), ids=a["ids"][ic].tolist()),
                   training=dict(train_ids=a["ids"][it].tolist(), calibration_ids=a["ids"][ic].tolist(),
                   teacher_epochs=teacher_epochs, head_epochs=head_epochs if head else 0,
-                  seed=int(seed), reference_config=dict(model.config),
+                  seed=int(seed), head_seed=recovery_seed if head is not None else None,
+                  reference_config=dict(model.config),
                   head_config=None if head is None else dict(head.config),
                   reference_optimizer=dict(name="AdamW", learning_rate=.0005, weight_decay=.001,
                                            gradient_clip=5., batch="full"),

@@ -21,7 +21,7 @@ def normalize_config(config=None):
     d=dict(DEFAULT_CONFIG)
     if config:
         unknown=set(config)-set(d)
-        if unknown:raise ValueError('Unknown M41 config '+str(unknown))
+        if unknown:raise ValueError('Unknown recovery configuration '+str(unknown))
         d.update(config)
     for k in ('width','bank_fields','max_training_nodes'):
         if int(d[k])!=d[k]:raise ValueError('Integer '+k)
@@ -91,7 +91,7 @@ class ResidualRecoveryHead(nn.Module):
         return dict(format='M41-unit-skip-nuisance-head-v1',config=self.config,seed=self.seed,
             noise_scale=self.noise_scale.cpu().numpy().tolist(),state_dict=self.state_dict(),training_metadata=self.training_metadata)
 def restore(state):
-    if state.get('format')!='M41-unit-skip-nuisance-head-v1':raise ValueError('Wrong M41 checkpoint')
+    if state.get('format')!='M41-unit-skip-nuisance-head-v1':raise ValueError('Invalid recovery checkpoint')
     head=ResidualRecoveryHead(state['noise_scale'],state['config'],state['seed'])
     head.load_state_dict(state['state_dict'],strict=True);head.training_metadata=state.get('training_metadata',{})
     return head

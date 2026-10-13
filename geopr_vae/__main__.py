@@ -26,6 +26,7 @@ def main():
     train.add_argument("--teacher-epochs", type=int, default=600)
     train.add_argument("--head-epochs", type=int, default=300)
     train.add_argument("--seed", type=int, default=20260929)
+    train.add_argument("--head-seed", type=int, help="Recovery-head seed; defaults to --seed")
     infer = commands.add_parser("predict", help="Score a complete new query field")
     infer.add_argument("--input", type=Path, required=True)
     infer.add_argument("--model", type=Path, required=True)
@@ -44,7 +45,7 @@ def main():
                 raise FileExistsError(f"Use a new output directory: {destination}")
             destination.mkdir(parents=True, exist_ok=True)
             bundle, history = pipeline.fit(data, method, data.get("train"), data.get("calibration"),
-                                           args.seed, args.teacher_epochs, args.head_epochs)
+                                           args.seed, args.teacher_epochs, args.head_epochs, head_seed=args.head_seed)
             pipeline.save(bundle, destination / "model.pt")
             arrays, details = pipeline.predict(bundle, data)
             np.savez_compressed(destination / "prediction.npz", **arrays)

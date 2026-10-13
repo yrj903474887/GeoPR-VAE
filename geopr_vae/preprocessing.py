@@ -25,7 +25,7 @@ def validate_data(data):
 
 
 def regional_split(ids, xy, fraction=0.2):
-    """M80 10 km tiles, Hamilton allocation, ID hashes; chemistry is unused."""
+    """10 km tiles, Hamilton allocation and ID hashes; chemistry is unused."""
     ids, xy = np.asarray(ids).astype(str), np.asarray(xy, float)
     if not 0 < fraction < 1:
         raise ValueError("fraction must lie in (0,1)")

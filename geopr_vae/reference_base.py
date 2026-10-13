@@ -1,4 +1,4 @@
-"""Conditional-input-matched AE/VAE and masked RAMP-VAE for M33.
+"""Conditional-input-matched AE/VAE and a target-masked variational reference.
 
 This module performs no data/file access at import and provides no training loop.
 The caller owns the split, preprocessing, optimizer, training schedule and truth-free

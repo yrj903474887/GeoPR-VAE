@@ -1,8 +1,7 @@
-"""Controlled M34 conditional AE/VAE extensions; M33 remains read-only.
+"""Conditional AE/VAE reference networks and masked variational objectives.
 
 The caller owns G-only preprocessing/training, candidate selection and scoring.
-M33-compatible defaults exactly retain M33 architecture, initialization, objective
-and training RNG consumption. Optional input noise corrupts the encoder input only;
+Default configuration specifies architecture, initialization, objective and random-number generation. Optional input noise corrupts the encoder input only;
 the original observation is still the reconstruction target. No clean truth enters
 the objective. RAMP uses a masked variational objective, not a full-data ELBO.
 
@@ -64,7 +63,7 @@ class ConditionalReferenceModel(archived.ConditionalReferenceModel):
     def __init__(self, method: str, config: dict, seed: int):
         configuration = normalize_config(method, config)
         super().__init__(method, configuration, seed)
-        # Parent construction preserves default M33 parameter initialization.
+        # Construct the shared reference network parameters.
         if self.config["prior_kind"] == "standard":
             self.prior_body, self.prior_output = None, None
         elif self.prior_body is None:
@@ -141,7 +140,7 @@ class ConditionalReferenceModel(archived.ConditionalReferenceModel):
         if not math.isfinite(float(epoch_fraction)) or not 0 <= float(epoch_fraction) <= 1:
             raise ValueError("epoch_fraction must lie in [0,1]; no implicit annealing")
         sigma = self.config["denoising_augmentation_std"]
-        # No RNG call for the default zero corruption: M33 streams stay exact.
+        # Zero corruption does not consume random draws.
         encoder_x = x + sigma * archived._rand(x.shape, x, generator, normal=True) if sigma else x
         zero = x.new_zeros(())
         terms = {"kl": zero, "kl_per_dim": zero, "protection_loss": zero,
@@ -290,7 +289,7 @@ def make_model(method: str, config: dict | None = None, seed: int = 0):
 
 def restore(state: dict):
     if state.get("format") != "M34-conditional-reference-v1":
-        raise ValueError("unsupported M34 checkpoint format")
+        raise ValueError("unsupported conditional-reference checkpoint format")
     model = make_model(state["method"], state["config"], state["seed"])
     model.load_state_dict(state["state_dict"], strict=True)
     return model
