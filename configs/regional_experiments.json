@@ -1,0 +1,18 @@
+{
+  "folds": [1, 2, 3, 4, 5],
+  "buffers_m": [4000, 8000],
+  "reference_epochs": 600,
+  "recovery_epochs": 300,
+  "patch_epochs": 100,
+  "reference_cv_seed": "2026091202 + 104729 * (fold - 1)",
+  "recovery_cv_seed": "2026410101 + 104729 * fold",
+  "patch_cv_seed": "2026101001 + 104729 * (fold - 1)",
+  "reference_global_seed": 20260929,
+  "recovery_global_seed": 20260929,
+  "patch_global_seed": 2027101004,
+  "patch_regional_readout": "matched input and reconstructed pixel [16,16]",
+  "patch_controlled_readout": "four central reconstructed pixels [15:17,15:17], averaged",
+  "geohgan_stages_epochs": [100, 100],
+  "geohgan_upstream_commit": "c2cce554b4ff8571c2f315ac8e11308f45443a2c",
+  "geohgan_upstream_url": "https://github.com/cbn001012/Geo-Hgan-Unsupervised-anomaly-detection-in-geochemical-data-via-latent-space-learning"
+}
