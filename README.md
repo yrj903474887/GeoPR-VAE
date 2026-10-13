@@ -2,7 +2,7 @@
 
 Research implementation accompanying **GeoPR-VAE: Spatial-Contrast Residual Deep Learning for Multielement Weak Geochemical Anomaly Identification**.
 
-This repository contains the conditional reference model, spatial-contrast recovery, training-only preprocessing, calibration and anomaly scoring, AE/VAE comparators, and regional grid interpolation. It is a compact, portable extraction of the implementation used in the manuscript. It contains no regional measurements, mineral-occurrence layers, trained weights, manuscript files, or historical experiment outputs.
+This repository contains the conditional reference model, spatial-contrast recovery, training-only preprocessing, calibration and anomaly scoring, AE/VAE comparators, and regional grid interpolation. The repository also provides controlled experiments, patch-based comparison models, paired weak-enrichment evaluation, mineral-association metrics, and figure-generation tools. Data, trained weights, and generated results are supplied or produced locally and are not included in the repository.
 
 ## Install and verify
 
@@ -13,9 +13,13 @@ python -m pip install -r requirements.txt
 python -m examples.smoke --save-input outputs/synthetic.npz --report outputs/smoke_report.json
 ```
 
-Run commands from the repository root. The implementation executes on CPU and uses one PyTorch thread, as in the original training. The smoke example generates a small synthetic field, runs all three methods, checks checkpoint and batching consistency, and evaluates a positive paired intervention. It uses 8 reference epochs and 12 recovery updates for speed. Its measurements are execution checks, not estimates of the paper's performance. No downloaded data are needed.
+Run commands from the repository root. The implementation executes on CPU and uses one PyTorch thread, for repeatable CPU execution. The smoke example generates a small synthetic field, runs all three methods, checks checkpoint and batching consistency, and evaluates a positive paired intervention. It uses 8 reference epochs and 12 recovery updates for speed. Its measurements are execution checks, not estimates of the paper's performance. No downloaded data are needed.
 
-Tested with Python 3.12.14, NumPy 2.3.5, SciPy 1.18.1 and PyTorch 2.14.0+cpu. See [validation](docs/VALIDATION.md).
+Additional checks are available through `python -m benchmarks.test_smoke` and `python -m scripts.smoke_evaluation --output outputs/evaluation_smoke --plots`. See [validation](docs/VALIDATION.md) for their scope. Dependency ranges in `requirements.txt` are installation constraints, not a claim that every supported combination produces identical numerical results.
+
+## Complete workflows
+
+[Experiment and figure workflows](docs/WORKFLOWS.md) documents the full six-method controlled matrix, buffered five-fold validation, 144 paired weak interventions, additional comparison networks, global deployment, mineral-association evaluation, cartography and tables. It includes exact command-line examples and file schemas. The core model interface is summarized below.
 
 ## Input schema
 
@@ -58,9 +62,9 @@ Create the `data/` directory first. Exclude mineral labels, known clean signals 
 python -m geopr_vae train --input data/region.npz --output outputs/region --method all
 ```
 
-`--method` also accepts `GeoPR-VAE`, `AE` or `VAE`. Defaults are the manuscript settings: 600 reference epochs, 300 GeoPR-VAE head updates, seed 20260929 and 16 posterior draws per target. The CLI and `pipeline.fit` apply these manuscript configurations. Low-level `reference.make_model` defaults retain the original general research settings; pass `pipeline.CONFIGS[method]` explicitly when using that constructor directly. Use `--teacher-epochs` and `--head-epochs` only when intentionally changing the training schedule. Outputs record the chosen schedule.
+`--method` also accepts `GeoPR-VAE`, `AE` or `VAE`. Defaults are the manuscript settings: 600 reference epochs, 300 GeoPR-VAE head updates, seed 20260929 and 16 posterior draws per target. `--head-seed` sets the recovery-head seed separately and defaults to `--seed`. For spatial validation, use the distinct seeds written by `benchmarks.prepare_region` as described below. The CLI and `pipeline.fit` apply these manuscript configurations. Low-level `reference.make_model` has separate general defaults; pass `pipeline.CONFIGS[method]` explicitly when using that constructor directly. Use `--teacher-epochs` and `--head-epochs` only when intentionally changing the training schedule. Outputs record the chosen schedule.
 
-If the two index vectors are absent, the regional deployment split allocates 20% to calibration using 10 km tiles, Hamilton allocation and fixed sample-ID hashes. For the original 4,651 valid samples this reproduces the 3,721 / 930 partition. It uses geometry and IDs, without chemical values or mineral labels. It is a deployment split and does **not** impose the buffered spatial exclusion used for the paper's independent validation.
+If the two index vectors are absent, the regional deployment split allocates 20% to calibration using 10 km tiles, Hamilton allocation and fixed sample-ID hashes. It uses geometry and IDs, without chemical values or mineral labels. It is a deployment split and does **not** impose the buffered spatial exclusion used for the paper's independent validation.
 
 Each method writes:
 
@@ -98,7 +102,7 @@ GeoPR-VAE masks one chemical target, fits a conditional Gaussian reference, and 
 
 AE/VAE recovery uses `D = R + 0.75*(x-R) + 0.25*max(x-R-0.5, 0)`, as in the configured manuscript comparison. Their anomaly scores still use the reference residual, not this recovery output.
 
-Calibration is split by the original salted ID hash into scale-fitting and score-transformation pools. Recovery graphs for these pools are computed separately. All methods use calibration median/MAD scaling; GeoPR-VAE additionally uses negative-energy adaptation. Signed channels are smoothed with a 10 km Gaussian bandwidth and 30 km cutoff. The composite is the mean of the largest three positive smoothed channels. Each channel receives a positive affine transformation fitted to the second calibration pool.
+Calibration is split by a fixed salted ID hash into scale-fitting and score-transformation pools. Recovery graphs for these pools are computed separately. All methods use calibration median/MAD scaling; GeoPR-VAE additionally uses negative-energy adaptation. Signed channels are smoothed with a 10 km Gaussian bandwidth and 30 km cutoff. The composite is the mean of the largest three positive smoothed channels. Each channel receives a positive affine transformation fitted to the second calibration pool.
 
 `prediction.npz` includes:
 
@@ -120,7 +124,7 @@ The command uses 12-neighbor inverse-distance weighting with power 2, then conve
 
 The caller supplies the land, convex-hull and sampling-support mask. The paper used 500 m cells, complete cell coverage by land and the valid-sample hull, nearest-sample distance at most 5 km, and at least three samples within 10 km. Its fixed 75,121-cell mask and mineral inventory are not distributed. Do not extrapolate into unsupported cells and interpret the resulting grid as the original study map.
 
-## Controlled experiments and spatial validation
+## Paired-intervention API
 
 `geopr_vae.experiments.paired_intervention` accepts a fitted model, an independent query field and a nonnegative log10-space intervention. It reruns both the frozen reference and recovery for the original and perturbed fields using the same IDs and posterior-draw keys. It reports directional preservation gain in training-standardized units, relative pair error and off-support RMS. Optional clean truth is used only for evaluator-side recovery RMSE.
 
@@ -131,8 +135,3 @@ report, original, perturbed = paired_intervention(bundle, query, delta_log10, cl
 
 Use the same geometry, training/calibration/evaluation roles and interventions across methods. For spatial validation, supply explicit `train` and `calibration` indices, fit one model per fold/buffer, then call `predict` separately on that fold's held-out query rows. Construct exclusions before fitting any preprocessing; check the intended geographic separation between every role pair. Do not interpret the default all-row deployment prediction as out-of-fold validation.
 
-The compact synthetic example is **not** the full confirmation protocol. This release does not include the archived realization generators, 10-base / background / noise / fold experiment launcher, selection history, 144-intervention bank, paired bootstrap tables, spatial fold membership, mineral evaluation or figure production. Those results are not claimed to be fully reproducible from this repository alone. Regional replication requires the authors' measurements, terrain/group inputs, valid sample identities, fixed splits, study-area/support geometry and occurrence inventory, with appropriate data access. Core fitting, scoring, paired interventions and regional inference are runnable with compatible user-supplied inputs.
-
-## Implementation provenance
-
-The portable modules preserve the selected M41 recovery implementation and M80 unified regional workflow. The reference implementation comes from M34/M33; neighborhood and pseudo-field mathematics from M40; calibration primitives from M35; group shrinkage from the original synthetic/preprocessing utilities. Historical directory lookups, machine-specific paths and frozen-run bookkeeping have been removed. Original random-number namespaces are retained to preserve the numerical streams. [Implementation notes](docs/METHODS.md) map the files and settings; [source hashes](docs/source_manifest.json) identify the original source files used for extraction.
