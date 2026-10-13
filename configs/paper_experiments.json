@@ -1,0 +1,144 @@
+{
+  "methods": {
+    "AE": {
+      "readout": {
+        "kind": "leaky",
+        "name": "leaky_a0.75_tau0.5",
+        "alpha": 0.75,
+        "tau": 0.5
+      },
+      "score": {
+        "geometry": "gaussian",
+        "norm": "cal_mad",
+        "radius_m": 10000
+      },
+      "score_carrier": "teacher_residual"
+    },
+    "VAE": {
+      "readout": {
+        "kind": "leaky",
+        "name": "leaky_a0.75_tau0.5",
+        "alpha": 0.75,
+        "tau": 0.5
+      },
+      "score": {
+        "geometry": "gaussian",
+        "norm": "cal_mad",
+        "radius_m": 10000
+      },
+      "score_carrier": "teacher_residual"
+    },
+    "GeoPR-VAE": {
+      "readout": {
+        "kind": "learned_correction"
+      },
+      "score": {
+        "geometry": "gaussian",
+        "norm": "negative_half",
+        "radius_m": 10000
+      },
+      "score_carrier": "learned_correction",
+      "head": {
+        "id": "noise_eq32",
+        "kind": "noise",
+        "config": {
+          "eq_weight": 32.0,
+          "feature_mode": "neighbor_contrast"
+        },
+        "epochs": 300
+      }
+    },
+    "VAE_patch": {
+      "readout": {
+        "name": "leaky_a0.75_tau0.5",
+        "kind": "leaky",
+        "alpha": 0.75,
+        "tau": 0.5
+      },
+      "score": {
+        "geometry": "gaussian",
+        "norm": "raw",
+        "radius_m": 10000
+      }
+    },
+    "GANomaly": {
+      "readout": {
+        "name": "leaky_a0.75_tau0.5",
+        "kind": "leaky",
+        "alpha": 0.75,
+        "tau": 0.5
+      },
+      "score": {
+        "geometry": "gaussian",
+        "norm": "field_mad",
+        "radius_m": 10000
+      }
+    },
+    "Skip_GANomaly": {
+      "readout": {
+        "name": "leaky_a0.75_tau0.5",
+        "kind": "leaky",
+        "alpha": 0.75,
+        "tau": 0.5
+      },
+      "score": {
+        "geometry": "gaussian",
+        "norm": "field_mad",
+        "radius_m": 6000
+      }
+    }
+  },
+  "reference_epochs": 600,
+  "recovery_epochs": 300,
+  "patch_epochs": 100,
+  "reference_seed": 2026091202,
+  "recovery_seed": 2026410101,
+  "patch_seed": 2026101001,
+  "fold_seed_offset": 104729,
+  "workers": 8,
+  "confirmation_seeds": [
+    2026411201,
+    2026411202,
+    2026411203,
+    2026411204,
+    2026411205,
+    2026411206,
+    2026411207,
+    2026411208,
+    2026411209,
+    2026411210
+  ],
+  "development_seeds": [
+    2026401201,
+    2026401202,
+    2026401203,
+    2026401204,
+    2026401205,
+    2026401206,
+    2026401207,
+    2026401208,
+    2026401209,
+    2026401210
+  ],
+  "families": [
+    "smooth_nonlinear",
+    "background_step",
+    "omitted_spatial_factor"
+  ],
+  "noises": [
+    "original",
+    "independent_gaussian",
+    "heavy_tails_t5",
+    "hidden_E_scale_jump"
+  ],
+  "buffers_m": [
+    4000,
+    8000
+  ],
+  "folds": [
+    0,
+    1,
+    2
+  ],
+  "probes_per_field": 144
+}
