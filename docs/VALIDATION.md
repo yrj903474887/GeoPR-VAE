@@ -1,11 +1,15 @@
-# Validation
+# Running validation checks
 
-Validated on 2026-10-09 with Python 3.12.14, NumPy 2.3.5, SciPy 1.18.1 and PyTorch 2.14.0+cpu.
+Run checks from the repository root in the same environment used for training.
 
-- `python -m examples.smoke`: passed for AE, VAE and GeoPR-VAE. Checks finite outputs, saved-model reload, reference prediction across different internal batch sizes, ID-keyed target masking, constant-residual unit gain with fixed references, training-only preprocessing, nonzero learned nuisance, paired complete-pipeline intervention and grid interpolation.
-- All three command-line workflows completed the full default training schedule on the generated 160-row example: 600 reference epochs, plus 300 GeoPR-VAE recovery updates. This checks schedule execution, not scientific accuracy on a small field.
-- The `predict` command loaded a trained checkpoint and scored a separate 24-row query field; `grid` interpolated its scores onto six supplied locations successfully.
-- Numerical extraction audit against the original source files: identical preprocessing arrays, network initial weights, objective terms, posterior references, recovery parameters after 12 updates, recovery predictions, and both calibration-MAD and negative-half score outputs for identical inputs and seeds. Maximum observed difference was zero for these comparisons in the tested environment.
-- The portable regional split reproduced the original 3,721 / 930 index partition from the original 4,651-sample geometry and identifiers. Those measurements and identifiers are not included in this repository.
+```bash
+python -m examples.smoke --save-input outputs/synthetic.npz --report outputs/smoke_report.json
+python -m benchmarks.test_smoke
+python -m scripts.smoke_evaluation --help
+```
 
-These checks establish runnable code and agreement with the extracted components on the tested inputs. They do not rerun the paper's full controlled confirmation, buffered regional validation or mineral-association analysis. Exact floating-point equality across different library versions and hardware is not asserted. The smoke example remains available without regional data; the original-source comparison requires the private research archive.
+The core smoke example exercises AE, VAE and GeoPR-VAE on generated inputs, checkpoint reload, batched reference prediction, target masking, training-fitted preprocessing, paired interventions and grid interpolation. It uses a short training schedule for software checks.
+
+The benchmark checks exercise the comparison networks, analytical fields, spatial splits and intervention metrics. The evaluation checks exercise occurrence capture, area efficiency, nearest-area distances, aggregation and figure generation using generated examples.
+
+Generated arrays, checkpoints, figures and reports belong in a local output directory and are excluded from version control. Small execution checks do not replace the configured full experiments. Library and hardware differences may affect floating-point results.
