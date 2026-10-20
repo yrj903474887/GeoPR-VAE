@@ -10,7 +10,7 @@ and preserve the model settings in `configs/paper_experiments.json` and
 | --- | --- | --- |
 | Quick software checks | Generated locally by the supplied Python examples | Installation, finite outputs, model reload, data-role checks and evaluation calculations |
 | Complete controlled experiments | Analytical fields generated locally by `benchmarks.controlled` | The six-method confirmation experiment under the paper's full schedules |
-| Regional validation and mapping | Study inputs obtained and prepared as described below | Five-fold spatial validation, regional predictions, occurrence evaluation and maps |
+| Regional validation and prediction | Study inputs obtained and prepared as described below | Five-fold spatial validation, gridded regional predictions and occurrence evaluation |
 
 The quick checks deliberately use small inputs and abbreviated training.
 Their numerical outputs are not the results reported in the paper. Full
@@ -22,19 +22,19 @@ into a complete confirmation experiment.
 ```bash
 python -m examples.smoke --save-input ../validation-output/core/synthetic.npz --report ../validation-output/core/smoke_report.json
 python -m benchmarks.test_smoke
-python -m scripts.smoke_evaluation --output ../validation-output/evaluation_smoke --plots --font-family "DejaVu Sans"
+python -m scripts.smoke_evaluation --output ../validation-output/evaluation_smoke
 python -m benchmarks.controlled --config configs/paper_experiments.json --phase confirmation --output ../validation-output/controlled_smoke --workers 1 --limit 1 --smoke
 ```
 
 Use fresh output directories for repeat runs. The first command generates a
 160-point, twelve-element field and checks the core models. The evaluation
-example creates local toy inputs, reports and plots. The last command exercises
+example creates local toy inputs and numerical evaluation reports. The last command exercises
 one controlled task with the runner's existing smoke option. It does not alter
 the experiment configuration file.
 
 [Validation](VALIDATION.md) describes the checks and their interpretation.
 [Environment](ENVIRONMENT.md) records the environment actually tested and the
-measured resource use. Generated data, reports, weights and plots remain local.
+measured resource use. Generated data, reports and weights remain local.
 
 ## 2. Complete controlled experiments
 
@@ -51,8 +51,7 @@ seeds are separate. Keep their results in separate directories.
 
 The aggregator validates completeness and rejects smoke outputs, missing tasks
 and duplicated tasks. [Workflows](WORKFLOWS.md#complete-controlled-experiment-matrix)
-gives the full procedure. [Figures](FIGURES.md) maps the resulting tables to
-the current manuscript figures and documents the final presentation steps.
+gives the full procedure and describes the resulting evaluation tables.
 
 ## 3. Obtain and prepare regional inputs
 
@@ -73,7 +72,6 @@ their providers' terms and follow the preparation instructions.
 | Regional point `.npz` | `log10[N,12]`, `xy[N,2]`, `terrain[N,3]`, `groups[N]`, `ids[N]`; optional terrain-quality `valid[N]` |
 | Effective-grid CSV | Unique `grid_id`, projected metre `x,y`, the common 500 m grid and the paper's sampling-support mask |
 | Evaluation occurrence CSV | `site_id,grid_id,x,y,primary_target_elements`, with the complete effective inventory and semicolon-separated commodities |
-| Cartographic inputs | Converted geology and faults, class mapping, geological occurrence coordinates, display boundary and georeferenced hillshade |
 
 The point input uses element order `Au, Ag, As, Bi, Cu, F, Mo, Pb, Sb, Sn, W, Zn`.
 Au and Ag are in ppb; the remaining elements are in ppm before taking `log10`.
@@ -104,11 +102,10 @@ Follow these sections of [WORKFLOWS.md](WORKFLOWS.md) in order:
 4. Fit the separate full-region deployment models.
 5. Interpolate onto the common effective grid and evaluate the complete
    matching occurrence inventory.
-6. Generate manuscript panels using the [figure mapping](FIGURES.md).
 
 The deployment split and buffered validation serve different purposes.
-Retain their distinct seeds and roles. Regional maps use the full-region model;
-they are not assembled by joining the held-out fold predictions.
+Retain their distinct seeds and roles. Regional response grids use the full-region
+model; they are not assembled by joining the held-out fold predictions.
 
 The existing commands and Python recipes are the executable interfaces.
 There is no separate one-command regional reproduction driver.

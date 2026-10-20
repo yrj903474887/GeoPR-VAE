@@ -1,8 +1,6 @@
-# Experiment and figure workflows
+# Experiment and evaluation workflows
 
 Run all commands from the repository root, after installing `requirements.txt`. For a tested installation and resource measurements, see [ENVIRONMENT.md](ENVIRONMENT.md). Input arrays and measurement units follow the [user guide](USER_GUIDE.md#input-schema). Outputs are local generated files; none are bundled with the source.
-
-For current manuscript panel names and integrated legends, follow [FIGURES.md](FIGURES.md). The plotting commands below also document the original intermediate outputs. Final panel assembly changes presentation only and does not retrain models or recompute scientific metrics.
 
 ## Complete controlled experiment matrix
 
@@ -13,17 +11,11 @@ python -m benchmarks.controlled --config configs/paper_experiments.json --phase 
 python -m benchmarks.aggregate --config configs/paper_experiments.json --phase confirmation --run outputs/controlled --output outputs/controlled_tables
 ```
 
-The schedules are method-specific: 600 reference epochs for the core AE/VAE/GeoPR-VAE models, 300 recovery updates for GeoPR-VAE, and 100 epochs for the three patch comparators. They are not all 100-epoch networks. To run only the patch extension, add `--methods VAE_patch GANomaly Skip_GANomaly`; to produce all six-method figures, all six complete method matrices are needed. The runner executes the requested task list on each invocation; use a new output directory to avoid overwriting an earlier run. `--save-predictions` additionally stores prediction arrays locally.
+The schedules are method-specific: 600 reference epochs for the core AE/VAE/GeoPR-VAE models, 300 recovery updates for GeoPR-VAE, and 100 epochs for the three patch comparators. They are not all 100-epoch networks. To run only the patch extension, add `--methods VAE_patch GANomaly Skip_GANomaly`; to compare all six methods, all six complete method matrices are needed. The runner executes the requested task list on each invocation; use a new output directory to avoid overwriting an earlier run. `--save-predictions` additionally stores prediction arrays locally.
 
 Use `--limit 1 --smoke` in a **separate output directory** for a one-epoch, two-probe execution check. The aggregator rejects these smoke results and rejects incomplete or duplicate research matrices. `--phase development` selects the separate development seed set; do not combine it with confirmation results.
 
-The aggregator emits `base_means.csv`, `noise_base_means.csv`, `amplitude_base_means.csv`, a long table and a summary. Each plotted controlled observation is one independent base mean, with nested families, folds and cases averaged first. The bar confidence intervals bootstrap the ten base means. The drawing commands are:
-
-```bash
-python -m plotting.paper_figures recovery --input outputs/controlled_tables/base_means.csv --output outputs/figs
-python -m plotting.paper_figures noise --input outputs/controlled_tables/noise_base_means.csv --output outputs/figs
-python -m plotting.paper_figures amplitude --input outputs/controlled_tables/amplitude_base_means.csv --output outputs/figs
-```
+The aggregator emits `base_means.csv`, `noise_base_means.csv`, `amplitude_base_means.csv`, a long table and a summary. Each controlled observation is one independent base mean, with nested families, folds and cases averaged first.
 
 ## Regional spatial validation and 144 weak interventions
 
@@ -74,7 +66,7 @@ python -m benchmarks.weak core-predict --input outputs/cv_b4_fold1/weak_input.np
 python -m benchmarks.weak evaluate --input outputs/cv_b4_fold1/weak_input.npz --predictions outputs/cv_b4_fold1/geopr_weak_predictions.npz --output outputs/cv_b4_fold1/geopr_weak.json
 ```
 
-Repeat core inference/evaluation for AE and VAE. The same trained model predicts the original field and all 144 perturbed fields. The input IDs and posterior keys remain fixed. `after_*` metrics evaluate the perturbed score; `delta_*` metrics evaluate its change relative to the original field. The weak-response figures use `delta_auc` and `delta_core_recall_top10`.
+Repeat core inference/evaluation for AE and VAE. The same trained model predicts the original field and all 144 perturbed fields. The input IDs and posterior keys remain fixed. `after_*` metrics evaluate the perturbed score; `delta_*` metrics evaluate its change relative to the original field. The weak-response analyses use `delta_auc` and `delta_core_recall_top10`.
 
 For each patch method, train **once on the prepared weak input**, which also performs all 145 predictions. Read its seed from `settings.json`, as in the core recipe:
 
@@ -94,11 +86,10 @@ for method in ("VAE_patch", "GANomaly", "Skip_GANomaly"):
     ], check=True)
 ```
 
-After all folds/buffers/methods finish, assemble a CSV manifest with columns `method,buffer_km,fold,path`; `path` points to each evaluation JSON and may be relative to the manifest. The final figure expects all six methods and five fold means for each buffer. Aggregation verifies 144 distinct cases in every supplied JSON.
+After all folds/buffers/methods finish, assemble a CSV manifest with columns `method,buffer_km,fold,path`; `path` points to each evaluation JSON and may be relative to the manifest. The complete comparison requires all six methods and five fold means for each buffer. Aggregation verifies 144 distinct cases in every supplied JSON.
 
 ```bash
 python -m scripts.aggregate_results weak-json --manifest outputs/weak_manifest.csv --output outputs/weak_tables
-python -m plotting.paper_figures weak --input outputs/weak_tables/fold_metrics.csv --output outputs/figs
 ```
 
 For already exported case-level CSVs, `scripts.aggregate_results controlled --cases FILE --output DIR` and `scripts.aggregate_results weak --cases FILE --output DIR` provide equivalent table interfaces; required columns are documented in `evaluation/controlled.py`.
@@ -169,37 +160,30 @@ Alternatively, `scripts.prepare_regional associations --responses FILE --output 
 
 Supply an occurrence CSV with `site_id,grid_id,x,y,primary_target_elements`, with one unique occurrence per occupied effective grid cell. Coordinates are in the grid's metre CRS; target elements are semicolon-separated, for example `Cu;Pb;Zn`. Include the complete effective occurrence inventory because **all supplied occurrence cells are excluded from the point-background AUC background**, including occurrences outside the currently matched commodity group. The field file has `grid_id`, `association_names` and one `METHOD[N,2]` array, with columns `Cu-Pb-Zn-Ag` and `W-Sn-Mo-Bi`.
 
-Matching follows the recorded primary commodities: Cu/Pb/Zn/Ag for the first association, W/Sn/Mo for the second. Bi remains a score channel but is not added as a new occurrence-matching label. The plotting symbol groups do not change this evaluation rule.
+Matching follows the recorded primary commodities: Cu/Pb/Zn/Ag for the first association, W/Sn/Mo for the second. Bi remains a score channel but is not added as a new occurrence-matching label.
 
 ```bash
 python -m evaluation.regional --grid outputs/grid.npz --fields outputs/association_fields.npz --occurrences data/occurrences.csv --output outputs/association
-python -m plotting.paper_figures capture --input outputs/association/association_capture_curves.npz --metrics outputs/association/association_metrics.csv --output outputs/figs
-python -m plotting.paper_figures distance --input outputs/association/association_per_site.csv --metrics outputs/association/association_metrics.csv --output outputs/figs
 python -m scripts.make_tables association --input outputs/association/association_metrics.csv --output outputs/tables/association
 ```
 
 Outputs include point-background AUC, cumulative capture over the full area, captured occurrence counts at 5/10/20% area, enrichment and occurrence density at 10%, areas required for 50/80% capture, and per-occurrence distances to the selected top-10% square-cell union. Distance is measured to cell boundaries, not merely cell centers. AUC gives half-credit for tied scores; area selection breaks ties by ascending grid ID. These metrics measure association with known occurrences in the shared effective area.
 
-## Cartography and tables
-
-All drawing commands accept `--font-dir` and `--font-family` (default `Times New Roman`) and optional `--png` previews. Supply a licensed local Times font if the operating system does not provide it. Each panel is saved as a separate PDF for LaTeX subfigure numbering. The user-drawn model schematic is not generated by these scripts.
+## Descriptive statistics and geological input conversion
 
 ```bash
-python -m plotting.regional_maps --grid outputs/grid.npz --fields outputs/association_fields.npz --occurrences data/occurrences.csv --boundary data/study_boundary_wgs84.geojson --output outputs/figs --png
-python -m plotting.spatial_folds --input data/spatial_roles.csv --heldout-fold 1 --output outputs/figs --png
 python -m scripts.make_tables statistics --input data/concentrations.csv --output outputs/tables/statistics
 ```
 
-Regional maps use the supplied WGS84 boundary. Nearest effective-cell lookup fills only the display boundary; it leaves evaluation fields and the effective-area mask unchanged. Spatial-fold CSV columns are `sample_id,x,y,fold,role_4km,role_8km`; coordinates are projected metres, fold labels are 1–5, and role codes are `T` (training), `C` (calibration), `E` (evaluation) and `X` (excluded) for the same held-out fold. Statistics input contains the twelve element columns in original positive concentration units (Au/Ag ppb; others ppm).
+Statistics input contains the twelve element columns in original positive concentration units (Au/Ag ppb; others ppm).
 
-For geological cartography, supply the verified 1:200,000 data as converted GeoPackages and a classification mapping. The extractor accepts repeated `--package` arguments. Expected geological polygon/line layer names and the attribute-mapping schema are documented at the top of `scripts/prepare_geology.py`. A preclassified source may use `--class-field` instead of `--mapping`.
+The optional geological input converter accepts verified GeoPackages and a classification mapping. It exports geological polygons and faults without drawing them. Expected layer names and the attribute-mapping schema are documented at the top of `scripts/prepare_geology.py`. Supply repeated `--package` arguments for multiple sources; a preclassified source may use `--class-field` instead of `--mapping`.
 
 ```bash
 python -m scripts.prepare_geology --package data/geology_200k.gpkg --mapping data/geology_classes.json --map-crs EPSG:4214 --output outputs/geology
-python -m plotting.geology --geology outputs/geology/geology.geojson --faults outputs/geology/faults.geojson --legend outputs/geology/legend.json --occurrences data/geological_occurrences.csv --boundary data/study_boundary_wgs84.geojson --province data/guangdong_wgs84.geojson --hillshade data/hillshade.tif --map-crs EPSG:4214 --output outputs/figs --png
 ```
 
-Geological GeoJSON coordinates must share the declared native geographic map CRS, and polygon properties contain `class_id`. The geological occurrence CSV uses `source_x,source_y,target_elements` in that same CRS (or the documented `x,y,primary_target_elements` aliases). It is distinct from the projected evaluation CSV. The boundary and optional province files use WGS84. Hillshade is a georeferenced, single-band 0–255 raster with its actual CRS. If an authoritative datum transformation is required, pass its PROJ pipeline text file through `--boundary-pipeline`; do not relabel coordinates to change their datum.
+The exported coordinates use the declared geographic CRS and polygon properties contain `class_id`. Supply the verified datum and classifications rather than relabelling coordinates or inferring geological units from display colors.
 
 ## Repository contents
 
@@ -209,9 +193,8 @@ Geological GeoJSON coordinates must share the declared native geographic map CRS
 | `benchmarks/` | Controlled analytical fields, spatial roles, patch networks and paired interventions |
 | `configs/` | Controlled and regional experiment settings |
 | `evaluation/` | Controlled aggregation and regional occurrence metrics |
-| `plotting/` | Quantitative panels, spatial folds and geological/regional maps |
 | `scripts/` | Input conversion, response mapping, aggregation and editable tables |
 | `examples/` | Generated-data execution checks |
 | `docs/` | Method and validation documentation |
 
-Keep user data, upstream third-party checkouts, trained models, generated tables/figures and manuscript files outside the tracked source tree. The repository provides calculation and plotting code; it does not distribute the study datasets or precomputed experimental results.
+Keep user data, upstream third-party checkouts, trained models, generated tables/figures and manuscript files outside the tracked source tree. The repository provides calculation, input-conversion and table-export code; it does not distribute the study datasets or precomputed experimental results.
