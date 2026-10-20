@@ -1,6 +1,8 @@
 # Experiment and figure workflows
 
-Run all commands from the repository root, after installing `requirements.txt`. Input arrays and measurement units follow the [README](../README.md#input-schema). Outputs are local generated files; none are bundled with the source.
+Run all commands from the repository root, after installing `requirements.txt`. For a tested installation and resource measurements, see [ENVIRONMENT.md](ENVIRONMENT.md). Input arrays and measurement units follow the [user guide](USER_GUIDE.md#input-schema). Outputs are local generated files; none are bundled with the source.
+
+For current manuscript panel names and integrated legends, follow [FIGURES.md](FIGURES.md). The plotting commands below also document the original intermediate outputs. Final panel assembly changes presentation only and does not retrain models or recompute scientific metrics.
 
 ## Complete controlled experiment matrix
 
