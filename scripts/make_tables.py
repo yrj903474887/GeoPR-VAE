@@ -5,6 +5,10 @@ import numpy as np
 import pandas as pd
 from evaluation.regional import ELEMENTS, ASSOCIATIONS
 
+METHODS = ["AE", "VAE", "VAE_patch", "GANomaly", "Skip_GANomaly", "GeoPR-VAE"]
+LABELS = {"AE": "AE", "VAE": "VAE", "VAE_patch": "Patch VAE", "GANomaly": "GANomaly",
+          "Skip_GANomaly": "Skip-GANomaly", "GeoPR-VAE": "GeoPR-VAE"}
+
 
 def descriptive_statistics(data):
     values = data[list(ELEMENTS)].to_numpy(float)
@@ -36,7 +40,6 @@ def main():
         for row in table.to_dict("records"):
             lines.append(row["element"] + " & " + " & ".join(f"{row[k]:.3g}" for k in ("min", "median", "mean", "max", "CV", "skewness")) + r" \\")
     else:
-        from plotting.style import METHODS, LABELS
         lines = [r"Fixed association & Method & $n$ & PB-AUC & $N_{10}$ & $A_{50}$ (\%) \\", r"\midrule"]
         for name in ASSOCIATIONS:
             group = data[(data.association == name) & data.model.isin(METHODS)]

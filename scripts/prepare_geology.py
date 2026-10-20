@@ -16,7 +16,18 @@ import fiona
 import shapely
 from shapely.geometry import shape, mapping
 from pyproj import CRS
-from plotting.geology import PALETTE
+
+PALETTE = {
+    "q": ("Quaternary", "#fff2a8"), "paleogene_neogene": ("Paleogene–Neogene", "#efc46e"),
+    "k": ("Cretaceous", "#a4d583"), "j": ("Jurassic", "#84ccd7"), "t": ("Triassic", "#ad94ca"),
+    "p": ("Permian", "#cd967d"), "c": ("Carboniferous", "#a8beb5"),
+    "dc": ("Devonian-Carboniferous", "#c3b791"), "d": ("Devonian", "#d0af7d"),
+    "s": ("Silurian", "#a4d2a0"), "o": ("Ordovician", "#78b79d"), "cambrian": ("Cambrian", "#a6ad76"),
+    "sinian": ("Sinian", "#dbb1a7"), "proterozoic": ("Proterozoic", "#cbb7d1"),
+    "granitoids": ("Granitoids", "#f0a1a1"), "other_intrusive": ("Other intrusive rocks", "#bd7397"),
+    "volcanic": ("Volcanic rocks", "#caa66f"), "dyke_rocks": ("Dykes and veins", "#918576"),
+    "migmatitic": ("Migmatitic rocks", "#d28daa"), "metamorphic_undiff": ("Metamorphic rocks", "#b1a5b6"),
+    "unclassified": ("Unclassified unit", "#e0e0e0"), "unmapped": ("No mapped unit", "#ffffff")}
 
 LAYERS = ["D01D", "D01B", "D02B", "D03D", "D07H", "D04N", "D04P", "D02H", "D05M"]
 MERGED = {"paleogene": "paleogene_neogene", "neogene": "paleogene_neogene", "granite": "granitoids",

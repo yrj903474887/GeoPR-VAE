@@ -1,7 +1,7 @@
-"""Exercise evaluation and plotting with generated toy inputs, never paper data.
+"""Exercise evaluation with generated toy inputs, never paper data.
 
 Write output outside the source repository, e.g.
-``python -m scripts.smoke_evaluation --output ../smoke --plots``.
+``python -m scripts.smoke_evaluation --output ../smoke``.
 The small input is for software checks, not a scientific performance result.
 """
 from __future__ import annotations
@@ -9,7 +9,6 @@ import argparse
 import json
 from pathlib import Path
 import numpy as np
-import pandas as pd
 from evaluation.regional import (ASSOCIATIONS, evaluate_methods, fixed_association_fields,
     write_csv, square_distance_km)
 from evaluation.controlled import bootstrap_mean_ci
@@ -18,8 +17,6 @@ from evaluation.controlled import bootstrap_mean_ci
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--output", type=Path, required=True)
-    parser.add_argument("--plots", action="store_true")
-    parser.add_argument("--font-family", default="Times New Roman")
     args = parser.parse_args()
     root = Path(__file__).resolve().parents[1]
     output = args.output.resolve()
@@ -57,31 +54,9 @@ def main():
     write_csv(output / "occurrences.csv", sites)
     write_csv(output / "association_metrics.csv", rows)
     write_csv(output / "association_per_site.csv", per_site)
-    if args.plots:
-        from plotting.style import configure
-        from plotting import paper_figures as plots
-        configure(family=args.font_family)
-        bases, noise, amplitudes, weak = [], [], [], []
-        for method in methods:
-            for buffer in (4000, 8000):
-                for seed in range(10):
-                    values = dict(method=method, buffer_m=buffer, base_seed=seed,
-                                  denoising_rmse=.7 + .2 * rng.random(), amplitude_gain_abs_error=.04 + .06 * rng.random())
-                    bases.append(values)
-                    noise.extend(dict(values, noise=n) for n in plots.NOISES)
-                    amplitudes.extend(dict(values, amplitude=a) for a in (.25, .5))
-                weak.extend(dict(method=method, buffer_km=buffer // 1000, fold=f,
-                    delta_auc=.6 + .3 * rng.random(), delta_core_recall_top10=.3 + .4 * rng.random()) for f in range(1, 6))
-        figs = output / "figures"
-        plots.recovery(pd.DataFrame(bases), figs, True)
-        plots.strata(pd.DataFrame(noise), figs, "noise", True)
-        plots.strata(pd.DataFrame(amplitudes), figs, "amplitude", True)
-        plots.weak(pd.DataFrame(weak), figs, True)
-        plots.capture(curves, rows, figs, True)
-        plots.distance(per_site, rows, figs, True)
     report = dict(status="PASS", point_background_auc="independent pairwise replay",
                   square_distance="inside and outside analytic cases", tie_handling="integer-grid deterministic",
-                  rows=len(rows), generated_toy_data=True, plot_panels=12 if args.plots else 0)
+                  rows=len(rows), generated_toy_data=True)
     (output / "smoke_checks.json").write_text(json.dumps(report, indent=2) + "\n", encoding="utf-8")
     print(json.dumps(report))
 
