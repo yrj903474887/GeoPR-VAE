@@ -4,7 +4,7 @@ Code accompanying **GeoPR-VAE: Spatial-Contrast Residual Deep Learning for Multi
 
 Paper authors: Runjie Yang, Fan Xiao and Qiuming Cheng. Corresponding author: [Fan Xiao](mailto:xiaofan3@mail.sysu.edu.cn).
 
-GeoPR-VAE identifies weak multielement geochemical anomalies through a target-masked conditional reference and spatial-contrast recovery. This repository includes the core method, comparison models, controlled experiments, buffered spatial validation, regional evaluation and plotting tools.
+GeoPR-VAE identifies weak multielement geochemical anomalies through a target-masked conditional reference and spatial-contrast recovery. This repository includes the core method, comparison models, controlled experiments, buffered spatial validation, regional evaluation and table exports.
 
 ## Installation
 
@@ -28,7 +28,7 @@ python -m examples.smoke --save-input ../validation-output/core/synthetic.npz --
 
 It uses 8 reference epochs and 12 recovery updates for software checks. Its outputs are not paper-performance estimates. Use a new output location when repeating a run. Additional checks are described in [VALIDATION.md](docs/VALIDATION.md).
 
-## Train, predict and map
+## Train, predict and create grid fields
 
 Once the input arrays have been prepared according to the [user guide](docs/USER_GUIDE.md#input-schema):
 
@@ -47,8 +47,7 @@ For independent spatial validation, use the explicit roles and separate seeds fr
 | Documentation | Contents |
 | --- | --- |
 | [Reproducibility](docs/REPRODUCIBILITY.md) | Quick checks, full synthetic experiments, regional data requirements and execution order |
-| [Workflows](docs/WORKFLOWS.md) | Executable commands and recipes for controlled experiments, spatial validation, regional maps and tables |
-| [Figures](docs/FIGURES.md) | Current manuscript figure numbers, source tables, plotting commands and final panel assembly |
+| [Workflows](docs/WORKFLOWS.md) | Executable commands and recipes for controlled experiments, spatial validation, regional grid fields and tables |
 | [User guide](docs/USER_GUIDE.md) | Input schemas, units, options, model outputs and expected behaviour |
 | [Environment](docs/ENVIRONMENT.md) | Tested dependencies, installation and measured short-check resource use |
 | [Validation](docs/VALIDATION.md) | Scope and interpretation of the supplied software checks |
@@ -62,4 +61,4 @@ Only code, configurations and documentation are distributed here. Data, trained 
 
 ## License
 
-The code and accompanying documentation are available under the [MIT License](LICENSE). External datasets, third-party source code and locally supplied fonts retain their respective terms; they are not relicensed by this repository. The optional Geo-Hgan adapter uses a separately obtained upstream checkout as described in [WORKFLOWS.md](docs/WORKFLOWS.md#additional-comparison-networks).
+The code and accompanying documentation are available under the [MIT License](LICENSE). External datasets and third-party source code retain their respective terms; they are not relicensed by this repository. The optional Geo-Hgan adapter uses a separately obtained upstream checkout as described in [WORKFLOWS.md](docs/WORKFLOWS.md#additional-comparison-networks).
