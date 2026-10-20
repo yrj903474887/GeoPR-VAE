@@ -9,6 +9,8 @@ operation when an authoritative transformation is available.
 from __future__ import annotations
 import argparse
 import json
+import math
+from io import BytesIO
 from pathlib import Path
 import numpy as np
 from matplotlib.patches import PathPatch, Patch, Rectangle, Polygon
@@ -21,6 +23,7 @@ from shapely.ops import transform
 from evaluation.regional import read_csv
 from .regional_maps import boundary_path, load_boundary, coordinate_label, SYMBOLS, DISPLAY_GROUPS, site_display_group
 from .style import configure, save, plt
+from .pdf_assembly import compose, one_page
 
 PALETTE = {
     "q": ("Quaternary", "#fff2a8"), "paleogene_neogene": ("Paleogene–Neogene", "#efc46e"),
@@ -104,64 +107,83 @@ def locator(ax, province, study):
     ax.add_patch(PathPatch(boundary_path(study), facecolor="#d4252a", edgecolor="#bb1720", linewidth=.4))
     xmin, ymin, xmax, ymax = province.bounds
     dx, dy = xmax - xmin, ymax - ymin
-    # Fit an equal projected scale to the fixed inset rectangle without moving
-    # its edges; reserve the bottom strip for the scale and province label.
+    ax.set(xlim=(xmin - .065 * dx, xmax + .065 * dx),
+           ylim=(ymin - .18 * dy, ymax + .055 * dy), xticks=[], yticks=[])
+    ax.set_aspect("equal", adjustable="datalim")
+    for spine in ax.spines.values():
+        spine.set_color("black")
+        spine.set_linewidth(.7)
     ax.figure.canvas.draw()
-    bounds = ax.get_window_extent()
-    ratio = bounds.width / bounds.height
-    width, height = 1.13 * dx, 1.48 * dy
-    width, height = max(width, height * ratio), max(height, width / ratio)
-    cx, cy = (xmin + xmax) / 2, (ymin + ymax) / 2 - .15 * dy
-    left, bottom = cx - width / 2, cy - height / 2
-    ax.set(xlim=(left, left + width), ylim=(bottom, bottom + height), xticks=[], yticks=[])
-    ax.set_aspect("auto")
-    ax.text(.5, .025, "Guangdong Province", transform=ax.transAxes, ha="center", va="bottom", fontsize=6)
-    right, y = left + .91 * width, bottom + .16 * height
-    bar = 200000
-    for left, color in ((right - bar, "black"), (right - bar / 2, "white")):
-        ax.add_patch(Rectangle((left, y), bar / 2, .015 * height, facecolor=color, edgecolor="black", linewidth=.4))
-    ax.text(right - bar, y + .03 * height, "0", fontsize=5.5, ha="center")
-    ax.text(right, y + .03 * height, "200 km", fontsize=5.5, ha="right")
+    left, right = ax.get_xlim()
+    bottom, top = ax.get_ylim()
+    ax.text(.5, .017, "Guangdong Province", transform=ax.transAxes, ha="center", va="bottom", fontsize=6.8)
+    # Keep a geodesic 200 km scale while using the inset's projected coordinates.
+    inverse = Transformer.from_crs(32649, 4326, always_xy=True)
+    start_x, start_y = left + .44 * (right - left), bottom + .14 * (top - bottom)
+    lon, lat = inverse.transform(start_x, start_y)
+    geod = Geod(ellps="WGS84")
+    points = [projection.transform(*geod.fwd(lon, lat, 90, distance)[:2])
+              for distance in (0, 100000, 200000)]
+    for i, color in enumerate(("#202020", "#9c9c9c")):
+        ax.plot([points[i][0], points[i + 1][0]], [points[i][1], points[i + 1][1]],
+                color=color, linewidth=1.5, zorder=9)
+    for x, y in points:
+        ax.plot([x, x], [y - .008 * (top - bottom), y + .008 * (top - bottom)],
+                color="#202020", linewidth=.5, zorder=9)
+    for index, label in ((0, "0"), (2, "200 km")):
+        x, y = points[index]
+        ax.text(x, y + .021 * (top - bottom), label, fontsize=5.8, ha="center", va="bottom")
 
 
-def aligned_legends(fig, ax, palette, output, png=False):
+def aligned_legends(fig, ax, palette):
     # Keep six rows and four columns so the mineral legend shares their origins.
+    # Text advances are measured at the publication export resolution; using
+    # the interactive 100 dpi renderer shifts the later columns fractionally.
+    fig.set_dpi(600)
     items = [Patch(facecolor=color, edgecolor="black", linewidth=.4, label=label) for label, color in palette.values()]
     items += [Line2D([], [], color="#d4252a", linewidth=.8, label="Fault"),
               Line2D([], [], color="black", linewidth=.6, label="Study-area boundary")]
-    ncols = min(4, len(items))
+    ncols = 4
     nrows = int(np.ceil(len(items) / ncols))
-    ncols = int(np.ceil(len(items) / nrows))
     fig.canvas.draw()
     renderer = fig.canvas.get_renderer()
     position = ax.get_position()
-    legend_ax = fig.add_axes([position.x0, .055, position.width, .18]); legend_ax.axis("off")
+    legend_ax = fig.add_axes([position.x0, .016, position.width, .187]); legend_ax.axis("off")
     fp = plt.matplotlib.font_manager.FontProperties(family=plt.rcParams["font.family"], size=8.5)
     width_px = legend_ax.get_window_extent(renderer).width
+    height_px = legend_ax.get_window_extent(renderer).height
     final_labels = [item.get_label() for item in items[(ncols - 1) * nrows:]]
+    if not final_labels:
+        final_labels = [item.get_label() for item in items]
     last_width = max(renderer.get_text_width_height_descent(label, fp, False)[0] for label in final_labels)
-    handle_px, gap_px = 14 * fig.dpi / 72, 5.5 * fig.dpi / 72
+    handle_px, gap_px = 14.025 * fig.dpi / 72, 5.525 * fig.dpi / 72
+    handle_height = .95 * 8.5 * fig.dpi / 72
     starts = np.linspace(0, (width_px - handle_px - gap_px - last_width) / width_px, ncols)
     for j, item in enumerate(items):
         column, row = divmod(j, nrows)
-        x, y = starts[column], .93 - row * .85 / max(1, nrows - 1)
+        x, y = starts[column], .92 - row * .76 / max(1, nrows - 1)
         if isinstance(item, Patch):
-            legend_ax.add_patch(Rectangle((x, y - .025), handle_px / width_px, .05,
+            legend_ax.add_patch(Rectangle((x, y - handle_height / height_px / 2),
+                handle_px / width_px, handle_height / height_px,
                 transform=legend_ax.transAxes, facecolor=item.get_facecolor(), edgecolor="black", linewidth=.4))
         else:
             legend_ax.plot([x, x + handle_px / width_px], [y, y], transform=legend_ax.transAxes,
                            color=item.get_color(), linewidth=item.get_linewidth())
-        legend_ax.text(x + (handle_px + gap_px) / width_px, y, item.get_label(), transform=legend_ax.transAxes,
-                       ha="left", va="center", fontsize=8.5)
-    mineral = plt.figure(figsize=(7.6, .28))
+        right_anchor = column == ncols - 1 and item.get_label() == max(final_labels,
+            key=lambda label: renderer.get_text_width_height_descent(label, fp, False)[0])
+        legend_ax.text(1 if right_anchor else x + (handle_px + gap_px) / width_px,
+                       y, item.get_label(), transform=legend_ax.transAxes,
+                       ha="right" if right_anchor else "left", va="center", fontsize=8.5)
+    mineral = plt.figure(figsize=(7.6, .23), dpi=600)
     mineral_ax = mineral.add_axes([position.x0, 0, position.width, 1]); mineral_ax.axis("off")
     for column, (group, (marker, color)) in enumerate(SYMBOLS.items()):
         x = starts[column]
-        mineral_ax.plot([x + .007], [.5], linestyle="", marker=marker, markersize=5.3,
+        mineral_ax.plot([x + (5.3 * fig.dpi / 72) / 2 / width_px], [.55],
+                        linestyle="", marker=marker, markersize=5.3, markeredgewidth=.65,
                         markerfacecolor=color, markeredgecolor="black", transform=mineral_ax.transAxes)
-        mineral_ax.text(x + (handle_px + gap_px) / width_px, .5, group.replace("-", "–"),
+        mineral_ax.text(x + (handle_px + gap_px) / width_px, .55, group.replace("-", "–"),
                         transform=mineral_ax.transAxes, fontsize=8.5, ha="left", va="center")
-    save(mineral, output, "fig02_occurrence_legend", png)
+    return mineral
 
 
 def main():
@@ -180,6 +202,8 @@ def main():
     parser.add_argument("--font-dir", type=Path)
     parser.add_argument("--font-family", default="Times New Roman")
     parser.add_argument("--png", action="store_true")
+    parser.add_argument("--components", action="store_true",
+        help="Also retain separate original-size map, locator and occurrence-legend PDFs")
     args = parser.parse_args()
     configure(args.font_dir, args.font_family)
     crs = CRS.from_user_input(args.map_crs)
@@ -190,10 +214,12 @@ def main():
     transformer = datum or Transformer.from_crs(4326, crs, always_xy=True)
     boundary = transform(transformer.transform, boundary_wgs)
     palette = json.loads(args.legend.read_text(encoding="utf-8")) if args.legend else PALETTE
-    fig = plt.figure(figsize=(7.6, 7.2))
-    ax = fig.add_axes([.074, .272, .852, .680])
+    fig = plt.figure(figsize=(7.6, 6.6))
+    ax = fig.add_axes([.074, .252, .852, .700])
     xmin, ymin, xmax, ymax = boundary.bounds
-    bounds = xmin - .025, ymin - .04, xmax + .025, ymax + .025
+    # Round the map display frame, not the geological geometry or sample coordinates.
+    bounds = (math.floor((xmin - .06) * 10) / 10, math.floor((ymin - .04) * 10) / 10,
+              math.ceil((xmax + .06) * 10) / 10, math.ceil((ymax + .04) * 10) / 10)
     clip = PathPatch(boundary_path(boundary), transform=ax.transData)
     for feature in features(args.geology):
         geom, category = shape(feature["geometry"]), feature["properties"]["class_id"]
@@ -219,7 +245,7 @@ def main():
         ax.scatter([float(record.get("source_x", record.get("x")))], [float(record.get("source_y", record.get("y")))],
                    s=29, marker=marker, facecolor=color, edgecolor="black", linewidth=.65, zorder=10)
     ax.set(xlim=(bounds[0], bounds[2]), ylim=(bounds[1], bounds[3]))
-    ax.set_aspect(1 / np.cos(np.deg2rad((ymin + ymax) / 2)))
+    ax.set_aspect(1 / np.cos(np.deg2rad((bounds[1] + bounds[3]) / 2)))
     ax.xaxis.set_major_locator(MultipleLocator(.5)); ax.yaxis.set_major_locator(MultipleLocator(.25))
     ax.xaxis.set_major_formatter(FuncFormatter(lambda v, p: "" if abs(v - 112.5) < 1e-8 else coordinate_label(v)))
     ax.yaxis.set_major_formatter(FuncFormatter(lambda v, p: coordinate_label(v, p, "N")))
@@ -230,24 +256,42 @@ def main():
     for spine in ax.spines.values():
         spine.set_color("black"); spine.set_linewidth(.7)
     north_arrow(ax)
-    geod = Geod(ellps="WGS84")
-    start, sy = bounds[0] + .04 * (bounds[2] - bounds[0]), bounds[1] + .045 * (bounds[3] - bounds[1])
+    geod = crs.get_geod()
+    start, sy = bounds[0] + .09, bounds[1] + .08
     points = [geod.fwd(start, sy, 90, d * 1000)[0] for d in (0, 10, 20, 30)]
     for i in range(3):
-        ax.add_patch(Rectangle((points[i], sy), points[i + 1] - points[i], .009, facecolor="black" if i % 2 == 0 else "white", edgecolor="black", linewidth=.5, zorder=10))
+        ax.add_patch(Rectangle((points[i], sy), points[i + 1] - points[i], .012, facecolor="black" if i % 2 == 0 else "white", edgecolor="black", linewidth=.5, zorder=10))
     for x, distance in zip(points, (0, 10, 20, 30)):
         ax.text(x, sy - .018, str(distance), fontsize=7.5, ha="center", va="top")
-    ax.text(points[-1] + .06, sy - .018, "km", fontsize=7.5, va="top")
+    ax.text(points[-1] + .065, sy - .018, "km", fontsize=7.5, va="top")
+    inset = None
     if args.province:
         province = load_boundary(args.province)
-        inset = ax.inset_axes([.79, 0, .21, .225], zorder=20)
+        inset = ax.inset_axes([.805, 0, .195, .22], zorder=20)
         locator(inset, province, boundary_wgs)
-        # A separate locator is also supplied for alternative LaTeX placement.
-        locator_fig, locator_ax = plt.subplots(figsize=(2.4, 2.1))
-        locator(locator_ax, province, boundary_wgs)
-        save(locator_fig, args.output, "fig02_a", args.png)
-    aligned_legends(fig, ax, palette, args.output, args.png)
-    save(fig, args.output, "fig02_b", args.png)
+    mineral = aligned_legends(fig, ax, palette)
+    args.output.mkdir(parents=True, exist_ok=True)
+    main_stream, mineral_stream = BytesIO(), BytesIO()
+    fig.savefig(main_stream, format="pdf")
+    mineral.savefig(mineral_stream, format="pdf")
+    main_stream.seek(0)
+    mineral_stream.seek(0)
+    # The complete page remains vector-based apart from the actual hillshade.
+    compose(547.2, 475.2, [(one_page(main_stream), 1, 0, 0),
+                          (one_page(mineral_stream), 1, 0, 0)], args.output / "Fig02.pdf")
+    if args.components:
+        mineral.savefig(args.output / "fig02_occurrence_legend.pdf")
+        if inset is not None:
+            fig.canvas.draw()
+            bbox = inset.get_window_extent().transformed(fig.dpi_scale_trans.inverted())
+            fig.savefig(args.output / "fig02_a.pdf", bbox_inches=bbox, pad_inches=0)
+            inset.set_visible(False)
+        fig.savefig(args.output / "fig02_b.pdf")
+    plt.close(mineral)
+    plt.close(fig)
+    if args.png:
+        from .map_legends import png_preview
+        png_preview(args.output / "Fig02.pdf")
 
 
 if __name__ == "__main__":

@@ -35,19 +35,20 @@ def selected_values(table, method, buffer, metric, **filters):
     return values
 
 
-def box(ax, values, position, color, width=.65, jitter=.16, size=23):
+def box(ax, values, position, color, width=.65, jitter=.16, size=23,
+        line_width=1, median_width=1.2, point_edge_width=.75, clip_on=True):
     ax.boxplot([values], positions=[position], widths=width, patch_artist=True, whis=1.5,
         showfliers=False, manage_ticks=False,
-        boxprops=dict(facecolor=color, edgecolor="black", linewidth=1),
-        medianprops=dict(color="black", linewidth=1.2),
-        whiskerprops=dict(color="black", linewidth=1), capprops=dict(color="black", linewidth=1), zorder=2)
+        boxprops=dict(facecolor=color, edgecolor="black", linewidth=line_width),
+        medianprops=dict(color="black", linewidth=median_width),
+        whiskerprops=dict(color="black", linewidth=line_width), capprops=dict(color="black", linewidth=line_width), zorder=2)
     ax.scatter(position + np.linspace(-jitter, jitter, len(values)), values, s=size, marker="o",
-        facecolor="white", edgecolor="black", linewidth=.75, zorder=3)
+        facecolor="white", edgecolor="black", linewidth=point_edge_width, zorder=3, clip_on=clip_on)
 
 
 def recovery(base, output, png=False):
-    for metric, name, label in [("denoising_rmse", "fig04_a", "Recovery RMSE"),
-                               ("amplitude_gain_abs_error", "fig04_c", "Mean casewise\namplitude-gain error")]:
+    for metric, name, label in [("denoising_rmse", "Fig04a", "Recovery RMSE"),
+                               ("amplitude_gain_abs_error", "Fig04b", "Mean casewise\namplitude-gain error")]:
         fig, ax = new_axes(label)
         combined = []
         for bi, buffer in enumerate((4000, 8000)):
@@ -86,12 +87,13 @@ def strata(table, output, scope, png=False):
         # The original pairwise axes are shared; expand rather than clip new results.
         upper = max(1.30 if isnoise else .18, max(tops) * 1.05)
         ax.set_ylim(0, upper)
-        save(fig, output, f"fig05_{'noise' if isnoise else 'gain'}_{buffer // 1000}km", png)
+        letter = ("a" if buffer == 4000 else "b") if isnoise else ("c" if buffer == 4000 else "d")
+        save(fig, output, "Fig05" + letter, png)
 
 
 def weak(table, output, png=False):
-    for metric, name, label in [("delta_auc", "fig_weak_delta_auc", "AUROC"),
-             ("delta_core_recall_top10", "fig_weak_delta_recall", "Core recall\n(top 10% of query points)")]:
+    for metric, name, label in [("delta_auc", "Fig06a", "AUROC"),
+             ("delta_core_recall_top10", "Fig06b", "Core recall\n(top 10% of query points)")]:
         fig = plt.figure(figsize=(8, 5.4))
         ax = fig.add_axes([.155, .30, .825, .64])
         for bi, buffer in enumerate((4, 8)):
@@ -102,7 +104,8 @@ def weak(table, output, png=False):
                 values = rows[metric].to_numpy(float)
                 if not np.isfinite(values).all() or ((values < 0) | (values > 1)).any():
                     raise ValueError("AUROC and core recall must be finite and in [0,1]")
-                box(ax, values, mi + bi * 8, COLORS[method], .62, .085, 22)
+                box(ax, values, mi + bi * 8, COLORS[method], .62, .085, 22,
+                    median_width=1.1, point_edge_width=.8)
         ax.set(xlim=(-.75, 13.75), ylim=(-.035, 1.045), xticks=[2.5, 10.5], xticklabels=["4 km", "8 km"])
         ax.set_ylabel(label, labelpad=9)
         frame(ax)
@@ -139,9 +142,10 @@ def capture(curves, metrics, output, png=False):
         frame(ax, .75, True)
         ax.tick_params(labelsize=12.75)
         handles = [Line2D([], [], color=COLORS[m], linestyle=LINE_STYLES[m], marker="s", markersize=5.5,
-            markeredgewidth=.4, markeredgecolor="black", linewidth=2, label=LABELS[m]) for m in METHODS]
-        legend_below(fig, ax, handles, bottom=.034, fontsize=12.75)
-        save(fig, output, "fig7_" + group, png)
+            markeredgewidth=.4, markeredgecolor="black", linewidth=2.2 if m == "GeoPR-VAE" else 1.85,
+            label=LABELS[m]) for m in METHODS]
+        legend_below(fig, ax, handles, bottom=.034, fontsize=12.75, frame_width=.6)
+        save(fig, output, "Fig09a" if group == "Cu10" else "Fig09b", png)
 
 
 def distance(sites, metrics, output, png=False):
@@ -156,7 +160,8 @@ def distance(sites, metrics, output, png=False):
             mean = float(lookup[method, group]["mean_distance10_km"])
             if not len(values) or not np.isfinite(values).all() or not np.isclose(values.mean(), mean, atol=1e-12, rtol=0):
                 raise ValueError("Per-occurrence distances and summary mean disagree")
-            box(ax, values, i, COLORS[method], .46, .135, 32)
+            box(ax, values, i, COLORS[method], .46, .135, 32,
+                line_width=1.2, median_width=1.6, point_edge_width=.9, clip_on=False)
             ax.scatter([i], [mean], marker="D", s=46, facecolors="#303030", edgecolors="black", linewidths=.65, zorder=6)
             ax.annotate(f"{mean:.2f}", xy=(i, mean), xytext=(21, 0), textcoords="offset points", ha="left", va="center",
                 fontsize=16, color="#303030", zorder=7, path_effects=[pe.withStroke(linewidth=2.2, foreground="white")])
@@ -166,8 +171,10 @@ def distance(sites, metrics, output, png=False):
         ax.set_ylabel("Distance to selected\nanomaly area (km)", fontsize=18, labelpad=10)
         ax.tick_params(axis="y", labelsize=16)
         frame(ax)
+        for spine in ax.spines.values():
+            spine.set_linewidth(1.2)
         fig.text(.56, .975, title, ha="center", va="top", fontsize=19)
-        save(fig, output, "fig8_" + group, png)
+        save(fig, output, "Fig10a" if group == "Cu10" else "Fig10b", png)
 
 
 def main():

@@ -4,14 +4,19 @@ The supplied NPZ holds the effective evaluation grid. Missing display cells
 inside the study boundary receive their nearest effective-cell value; this
 never changes the scores, occurrence matching, or area used for evaluation.
 Boundary input is a WGS84 GeoJSON Polygon/MultiPolygon or FeatureCollection.
+Default outputs are Fig07a-f (W-Sn-Mo-Bi) and Fig08a-f (Cu-Pb-Zn-Ag),
+each with an integrated colour and occurrence legend. --legacy-names keeps
+the original map panels and separate shared-legend files.
 """
 from __future__ import annotations
 
 import argparse
+from io import BytesIO
 import json
 from pathlib import Path
 
 import numpy as np
+from matplotlib import font_manager
 from matplotlib.path import Path as MplPath
 from matplotlib.patches import PathPatch, Rectangle
 from matplotlib.lines import Line2D
@@ -194,7 +199,7 @@ def draw(ax, values, context, records, crs, limits=None):
     return present
 
 
-def legend(output, key, present, png=False):
+def legend_figure(present):
     fig = plt.figure(figsize=(18 / 2.54, 2.5 / 2.54))
     bar = fig.colorbar(ScalarMappable(norm=Normalize(0, 1), cmap="RdYlBu_r"),
         cax=fig.add_axes([.265, .772, .47, .115]), orientation="horizontal", ticks=np.linspace(0, 1, 6))
@@ -205,6 +210,11 @@ def legend(output, key, present, png=False):
         for group, (marker, color) in SYMBOLS.items() if group in present]
     fig.legend(handles=handles, loc="lower center", bbox_to_anchor=(.5, .02), ncol=max(1, len(handles)),
                frameon=False, fontsize=10, handletextpad=.4, handlelength=1, borderpad=0, columnspacing=1.6)
+    return fig
+
+
+def legend(output, key, present, png=False):
+    fig = legend_figure(present)
     save(fig, output, f"fig6_{key}_legend", png)
 
 
@@ -220,7 +230,9 @@ def main():
     parser.add_argument("--output", type=Path, required=True)
     parser.add_argument("--font-dir", type=Path)
     parser.add_argument("--font-family", default="Times New Roman")
-    parser.add_argument("--png", action="store_true")
+    parser.add_argument("--png", action="store_true", help="Also render PNG; integrated panels require Poppler on PATH")
+    parser.add_argument("--legacy-names", action="store_true",
+                        help="Write original fig6_* map PDFs and separate shared legends")
     args = parser.parse_args()
     configure(args.font_dir, args.font_family)
     grid, fields = load_npz(args.grid), load_npz(args.fields)
@@ -228,10 +240,21 @@ def main():
         parser.error("Field/geometry grid IDs differ")
     sites = normalize_sites(read_csv(args.occurrences), grid, args.cell_size)
     context = display_geometry(grid, load_boundary(args.boundary), args.crs, args.cell_size)
+    if not args.legacy_names:
+        from .map_legends import legend_footer, append_legend, png_preview
+        font_path = font_manager.findfont(args.font_family, fallback_to_default=False)
     for column, (key, targets) in enumerate(zip(("CuPbZnAg", "WSnMoBi"), MATCH_TARGETS)):
         records = [r for r in sites if set(r["primary_target_elements"].split(";")) & set(targets)]
         present = set()
-        for method in METHODS:
+        if not args.legacy_names:
+            groups = {site_display_group(record) for record in records}
+            legend_fig = legend_figure(groups)
+            legend_stream = BytesIO()
+            legend_fig.savefig(legend_stream, format="pdf", dpi=400)
+            plt.close(legend_fig)
+            items = [(group, marker, color) for group, (marker, color) in SYMBOLS.items() if group in groups]
+            footer = legend_footer(legend_stream.getvalue(), items, font_path)
+        for panel, method in enumerate(METHODS):
             values = fields[method][:, column]
             if not np.isfinite(values).all() or ((values < 0) | (values > 1)).any():
                 parser.error("Association percentiles must be finite within [0,1]")
@@ -239,8 +262,19 @@ def main():
             ax = fig.add_axes([.093, .090, .814, .745])
             present |= draw(ax, values, context, records, args.crs, args.extent)
             fig.text(.5, .980, LABELS[method], ha="center", va="top", fontsize=12.5, fontweight="bold")
-            save(fig, args.output, f"fig6_{key}_{method.replace('-', '_')}", args.png)
-        legend(args.output, key, present, args.png)
+            if args.legacy_names:
+                save(fig, args.output, f"fig6_{key}_{method.replace('-', '_')}", args.png)
+            else:
+                stream = BytesIO()
+                fig.savefig(stream, format="pdf", dpi=400)
+                plt.close(fig)
+                number = 8 if key == "CuPbZnAg" else 7
+                destination = args.output / f"Fig{number:02d}{chr(97 + panel)}.pdf"
+                append_legend(stream.getvalue(), footer, destination)
+                if args.png:
+                    png_preview(destination)
+        if args.legacy_names:
+            legend(args.output, key, present, args.png)
 
 
 if __name__ == "__main__":

@@ -41,7 +41,8 @@ def frame(ax, scale=1, grid_x=False):
     ax.tick_params(length=4 * scale, width=.85 * scale, pad=6 * scale, color="#000000")
 
 
-def legend_below(fig, ax, handles=None, bottom=.035, fontsize=17):
+def legend_below(fig, ax, handles=None, bottom=.035, fontsize=17,
+                 handletextpad=.35, columnspacing=.55, frame_width=.8):
     if handles is None:
         handles = [Patch(facecolor=COLORS[m], edgecolor="black", linewidth=.8, label=LABELS[m]) for m in METHODS]
     position = ax.get_position()
@@ -49,9 +50,9 @@ def legend_below(fig, ax, handles=None, bottom=.035, fontsize=17):
     legend = fig.legend(handles=ordered, loc="lower left", bbox_to_anchor=(position.x0, bottom, position.width, .15),
         bbox_transform=fig.transFigure, mode="expand", borderaxespad=0, ncol=3,
         frameon=True, fancybox=True, facecolor="white", edgecolor="black", framealpha=1,
-        fontsize=fontsize, handlelength=1.4, handletextpad=.35, labelspacing=.25,
-        columnspacing=.55, borderpad=.35)
-    legend.get_frame().set_linewidth(.8)
+        fontsize=fontsize, handlelength=1.4, handletextpad=handletextpad, labelspacing=.25,
+        columnspacing=columnspacing, borderpad=.35)
+    legend.get_frame().set_linewidth(frame_width)
     return legend
 
 
@@ -62,7 +63,7 @@ def new_axes(ylabel, title=None):
     frame(ax)
     if title:
         ax.set_title(title, fontsize=19, pad=7)
-    legend_below(fig, ax)
+    legend_below(fig, ax, handletextpad=.45, columnspacing=1.0)
     return fig, ax
 
 
